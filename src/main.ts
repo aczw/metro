@@ -1,37 +1,69 @@
 import GUI from "lil-gui";
 import * as THREE from "three";
-import "./style.css";
 
+import "@/src/style.css";
+
+// Globals
+const canvas = document.querySelector<HTMLCanvasElement>("#c")!;
+const renderer = new THREE.WebGLRenderer({ antialias: true, canvas });
+const camera = new THREE.PerspectiveCamera(50, 2, 0.1, 100);
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 
-const renderer = new THREE.WebGLRenderer();
-renderer.setSize(window.innerWidth, window.innerHeight);
-document.body.appendChild(renderer.domElement);
+function setupGUI() {
+  const controls = {
+    color: 0xff00ff,
+    speed: 0.01,
+  };
 
-const gui = new GUI();
-gui.add(document, "title");
+  const gui = new GUI();
+  const color = gui.addColor(controls, "color");
+  const speed = gui.add(controls, "speed", 0.001, 0.1, 0.001);
 
-const obj = {
-  color: 0xff00ff,
-};
-const color = gui.addColor(obj, "color");
+  return { color, speed };
+}
 
-const geometry = new THREE.BoxGeometry(1, 1, 1);
-const material = new THREE.MeshLambertMaterial({ color: color.getValue() });
-const cube = new THREE.Mesh(geometry, material);
+function main() {
+  const { color, speed } = setupGUI();
 
-scene.add(cube);
-camera.position.z = 5;
+  camera.position.z = 5;
 
-const light = new THREE.PointLight(0xffffff, 100);
-light.position.set(5, 0, 5);
-scene.add(light);
+  const geometry = new THREE.BoxGeometry(1, 1, 1);
+  const material = new THREE.MeshLambertMaterial({ color: color.getValue() });
+  const cube = new THREE.Mesh(geometry, material);
 
-renderer.setAnimationLoop(() => {
-  cube.rotation.x += 0.01;
-  cube.rotation.y += 0.01;
-  cube.material.setValues({ color: color.getValue() });
+  scene.add(cube);
 
-  renderer.render(scene, camera);
-});
+  const light = new THREE.DirectionalLight(0xffffff, 3);
+  light.position.set(-1, 2, 4);
+
+  scene.add(light);
+
+  function resizeRendererToDisplaySize() {
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+    const needResize = canvas.width !== width || canvas.height !== height;
+
+    if (needResize) {
+      renderer.setSize(width, height, false);
+      camera.aspect = canvas.clientWidth / canvas.clientHeight;
+      camera.updateProjectionMatrix();
+    }
+  }
+
+  function render(time: number) {
+    time *= 0.001;
+    console.log("time:", time);
+
+    cube.rotation.x += speed.getValue();
+    cube.rotation.y += speed.getValue();
+    cube.material.setValues({ color: color.getValue() });
+
+    resizeRendererToDisplaySize();
+
+    renderer.render(scene, camera);
+  }
+
+  renderer.setAnimationLoop(render);
+}
+
+main();
