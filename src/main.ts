@@ -4,11 +4,6 @@ import * as THREE from "three";
 
 import { Timer } from "three/addons/misc/Timer.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
-import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
-import { BloomPass } from "three/addons/postprocessing/BloomPass.js";
-import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 import "@/src/style.css";
 
