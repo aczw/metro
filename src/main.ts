@@ -41,11 +41,11 @@ function setupStats() {
   return stats;
 }
 
-function printRendererInfo() {
-  console.log("Renderer memory:", renderer.info.memory);
-  console.log("Renderer render:", renderer.info.render);
-  console.log("Scene count:", scene.children.length);
-}
+// function printRendererInfo() {
+//   console.log("Renderer memory:", renderer.info.memory);
+//   console.log("Renderer render:", renderer.info.render);
+//   console.log("Scene count:", scene.children.length);
+// }
 
 function main() {
   const { speed } = setupGUI();
