@@ -4,6 +4,7 @@ import * as THREE from "three";
 
 import "@/src/style.css";
 import { Timer } from "three/addons/misc/Timer.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
 // Globals
 const canvas = document.querySelector<HTMLCanvasElement>("#c")!;
@@ -11,22 +12,22 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, canvas });
 const camera = new THREE.PerspectiveCamera(50, 2, 0.1, 100);
 const scene = new THREE.Scene();
 
-const platforms: THREE.Mesh[] = [];
-const platformWidth = 2;
+let platform: THREE.Object3D;
+const platformWidth = 10;
+
+const activePlatforms: THREE.Object3D[] = [];
 let offset = 0;
 let elapsed = 0;
 
 function setupGUI() {
   const controls = {
-    color: 0xff00ff,
-    speed: 0.01,
+    speed: 0.02,
   };
 
   const gui = new GUI();
-  const color = gui.addColor(controls, "color");
   const speed = gui.add(controls, "speed", 0.001, 0.1, 0.001);
 
-  return { color, speed };
+  return { speed };
 }
 
 function setupStats() {
@@ -38,36 +39,73 @@ function setupStats() {
 }
 
 function main() {
+  const { speed } = setupGUI();
   const stats = setupStats();
   const timer = new Timer();
 
-  const geometry = new THREE.BoxGeometry(platformWidth, 1, 1);
+  function loadPlatform() {
+    const loader = new GLTFLoader();
+
+    loader.load(
+      "/_models/platform_v1.glb",
+
+      ({ scene: wrappers }) => {
+        // Initial scene has a lot of wrappers for some reason
+        platform = wrappers.children[0].children[0];
+
+        // Fix some initial import transforms
+        platform.scale.set(1, 1, 1);
+        platform.rotation.y = Math.PI;
+
+        console.log("Loaded platform:", platform);
+        initScene();
+      },
+
+      undefined,
+
+      (error) => {
+        console.error("Error loading platform:", error);
+      },
+    );
+  }
 
   function initScene() {
-    camera.position.z = 8;
-    camera.position.y = 2;
+    // Add two platform to the left, translate manually
+    let platformCopy = platform.clone();
+    platformCopy.position.z = -20;
+    scene.add(platformCopy);
+    activePlatforms.push(platformCopy);
 
-    const light = new THREE.DirectionalLight(0xffffff, 3);
-    light.position.set(-1, 2, 4);
-    scene.add(light);
+    platformCopy = platform.clone();
+    platformCopy.position.z = -10;
+    scene.add(platformCopy);
+    activePlatforms.push(platformCopy);
 
-    // Positioned at origin, offset remains 0
-    const mat1 = new THREE.MeshLambertMaterial({ color: 0xff0000 });
-    const cube1 = new THREE.Mesh(geometry, mat1);
-    scene.add(cube1);
+    // Positioned at origin, don't offset
+    scene.add(platform);
+    activePlatforms.push(platform);
 
-    // Offset by geometry width
+    // Offset by geometry width, offset is 10 now
     offset += platformWidth;
 
-    // Second platform, so begin using offset to translate
-    const mat2 = new THREE.MeshLambertMaterial({ color: 0x00ff00 });
-    const cube2 = new THREE.Mesh(geometry, mat2);
-    cube2.translateX(offset);
-    scene.add(cube2);
+    // Add a platform to the left by offset amount
+    platformCopy = platform.clone();
+    platformCopy.position.setZ(offset);
+    scene.add(platformCopy);
+    activePlatforms.push(platformCopy);
 
+    // Offset by geometry width, offset is 20 now
     offset += platformWidth;
 
-    platforms.push(cube1, cube2);
+    platformCopy = platform.clone();
+    platformCopy.position.setZ(offset);
+    scene.add(platformCopy);
+    activePlatforms.push(platformCopy);
+
+    // Setup offset for next platform
+    offset += platformWidth;
+
+    console.log("Active platforms after initScene():", activePlatforms);
   }
 
   function resizeRendererToDisplaySize() {
@@ -86,29 +124,36 @@ function main() {
     timer.update(time);
     elapsed += timer.getDelta();
 
-    if (elapsed > 3) {
-      const newMat = new THREE.MeshLambertMaterial({
-        color: new THREE.Color(Math.random(), Math.random(), Math.random()),
-      });
-      const newCube = new THREE.Mesh(geometry, newMat);
-      newCube.translateX(offset);
+    if (elapsed >= 3) {
+      const newPlatform = platform.clone();
+      newPlatform.position.z = offset;
 
-      platforms.push(newCube);
-      scene.add(newCube);
+      activePlatforms.push(newPlatform);
+      scene.add(newPlatform);
+
       offset += platformWidth;
-
-      console.log("added new cube, reset at", timer.getElapsed());
       elapsed = 0;
+
+      // console.log("Added new platform at time:", timer.getElapsed());
+      // console.log("Renderer memory:", renderer.info.memory);
+      // console.log("Renderer render:", renderer.info.render);
     }
 
-    camera.position.x += 0.005;
+    camera.position.z += speed.getValue();
 
     resizeRendererToDisplaySize();
-
     renderer.render(scene, camera);
   }
 
-  initScene();
+  loadPlatform();
+
+  camera.position.y = 6.5;
+  camera.rotation.y = -Math.PI / 2;
+  camera.position.x = -18;
+
+  const light = new THREE.DirectionalLight(0xffffff, 3);
+  light.position.set(-10, 5, 0);
+  scene.add(light);
 
   renderer.setAnimationLoop((time) => {
     stats.begin();
