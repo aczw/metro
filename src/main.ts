@@ -2,26 +2,34 @@ import GUI from "lil-gui";
 import Stats from "stats.js";
 import * as THREE from "three";
 
-import "@/src/style.css";
 import { Timer } from "three/addons/misc/Timer.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { BloomPass } from "three/addons/postprocessing/BloomPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+import "@/src/style.css";
 
 // Globals
 const canvas = document.querySelector<HTMLCanvasElement>("#c")!;
-const renderer = new THREE.WebGLRenderer({ antialias: true, canvas });
 const camera = new THREE.PerspectiveCamera(50, 2, 0.1, 100);
 const scene = new THREE.Scene();
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, canvas });
+renderer.shadowMap.enabled = true;
+renderer.toneMapping = THREE.NeutralToneMapping;
 
 let platform: THREE.Object3D;
 const platformWidth = 10;
 
 const activePlatforms: THREE.Object3D[] = [];
 let offset = 0;
-let elapsed = 0;
 
 function setupGUI() {
   const controls = {
-    speed: 0.02,
+    speed: 0.04,
   };
 
   const gui = new GUI();
@@ -38,6 +46,12 @@ function setupStats() {
   return stats;
 }
 
+function printRendererInfo() {
+  console.log("Renderer memory:", renderer.info.memory);
+  console.log("Renderer render:", renderer.info.render);
+  console.log("Scene count:", scene.children.length);
+}
+
 function main() {
   const { speed } = setupGUI();
   const stats = setupStats();
@@ -47,7 +61,7 @@ function main() {
     const loader = new GLTFLoader();
 
     loader.load(
-      "/_models/platform_v1.glb",
+      "/_models/platform_v2.glb",
 
       ({ scene: wrappers }) => {
         // Initial scene has a lot of wrappers for some reason
@@ -56,6 +70,14 @@ function main() {
         // Fix some initial import transforms
         platform.scale.set(1, 1, 1);
         platform.rotation.y = Math.PI;
+
+        // Traverse the scene to turn on shadows for all objects
+        platform.traverse((obj) => {
+          if (obj.castShadow !== undefined) {
+            obj.castShadow = true;
+            obj.receiveShadow = true;
+          }
+        });
 
         console.log("Loaded platform:", platform);
         initScene();
@@ -70,41 +92,18 @@ function main() {
   }
 
   function initScene() {
-    // Add two platform to the left, translate manually
-    let platformCopy = platform.clone();
-    platformCopy.position.z = -20;
-    scene.add(platformCopy);
-    activePlatforms.push(platformCopy);
+    let platformCopy: THREE.Object3D;
 
-    platformCopy = platform.clone();
-    platformCopy.position.z = -10;
-    scene.add(platformCopy);
-    activePlatforms.push(platformCopy);
+    for (let i = -2; i <= 2; ++i) {
+      platformCopy = platform.clone();
+      platformCopy.position.z = i * 10;
 
-    // Positioned at origin, don't offset
-    scene.add(platform);
-    activePlatforms.push(platform);
+      activePlatforms.push(platformCopy);
+      scene.add(platformCopy);
+    }
 
-    // Offset by geometry width, offset is 10 now
-    offset += platformWidth;
-
-    // Add a platform to the left by offset amount
-    platformCopy = platform.clone();
-    platformCopy.position.setZ(offset);
-    scene.add(platformCopy);
-    activePlatforms.push(platformCopy);
-
-    // Offset by geometry width, offset is 20 now
-    offset += platformWidth;
-
-    platformCopy = platform.clone();
-    platformCopy.position.setZ(offset);
-    scene.add(platformCopy);
-    activePlatforms.push(platformCopy);
-
-    // Setup offset for next platform
-    offset += platformWidth;
-
+    // Manually update offset this time
+    offset = 30;
     console.log("Active platforms after initScene():", activePlatforms);
   }
 
@@ -120,11 +119,15 @@ function main() {
     }
   }
 
+  let addElapsed = 0;
+  let rmElapsed = 0;
+
   function render(time: number) {
     timer.update(time);
-    elapsed += timer.getDelta();
+    addElapsed += timer.getDelta();
+    rmElapsed += timer.getDelta();
 
-    if (elapsed >= 3) {
+    if (addElapsed >= 1.5 && platform) {
       const newPlatform = platform.clone();
       newPlatform.position.z = offset;
 
@@ -132,14 +135,18 @@ function main() {
       scene.add(newPlatform);
 
       offset += platformWidth;
-      elapsed = 0;
+      addElapsed = 0;
+    }
 
-      // console.log("Added new platform at time:", timer.getElapsed());
-      // console.log("Renderer memory:", renderer.info.memory);
-      // console.log("Renderer render:", renderer.info.render);
+    if (rmElapsed >= 3) {
+      const oldPlatform = activePlatforms.shift()!;
+      scene.remove(oldPlatform);
+      rmElapsed = 0;
     }
 
     camera.position.z += speed.getValue();
+    light.position.z = camera.position.z;
+    light.target.position.z = camera.position.z;
 
     resizeRendererToDisplaySize();
     renderer.render(scene, camera);
@@ -147,13 +154,25 @@ function main() {
 
   loadPlatform();
 
+  // const controls = new OrbitControls(camera, renderer.domElement);
   camera.position.y = 6.5;
   camera.rotation.y = -Math.PI / 2;
   camera.position.x = -18;
+  // controls.update();
 
   const light = new THREE.DirectionalLight(0xffffff, 3);
-  light.position.set(-10, 5, 0);
+  light.position.copy(camera.position);
+  light.target.position.set(0, camera.position.y, camera.position.z);
+  light.castShadow = true;
+
+  const lightCam = light.shadow.camera;
+  lightCam.left = -25;
+  lightCam.right = 25;
+  lightCam.bottom = -10;
+  lightCam.top = 10;
+
   scene.add(light);
+  scene.add(light.target);
 
   renderer.setAnimationLoop((time) => {
     stats.begin();
