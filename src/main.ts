@@ -78,7 +78,9 @@ function main() {
         initScene();
       },
 
-      undefined,
+      (progress) => {
+        console.log(`${(progress.loaded / progress.total) * 100}% loaded`);
+      },
 
       (error) => {
         console.error("Error loading platform:", error);
