@@ -32,28 +32,28 @@ type Platform = {
 
 const activePlatforms: Platform[] = [];
 
-function setupGUI() {
-  const controls = {
-    speed: 0.04,
-    intensity: 10,
-    y: 6.5,
-  };
+// function setupGUI() {
+//   const controls = {
+//     speed: 0.04,
+//     intensity: 10,
+//     y: 6.5,
+//   };
 
-  const gui = new GUI();
-  const speed = gui.add(controls, "speed", 0.001, 0.1, 0.001);
-  const intensity = gui.add(controls, "intensity", 1, 100);
-  const y = gui.add(controls, "y", -50, 50, 1);
+//   const gui = new GUI();
+//   const speed = gui.add(controls, "speed", 0.001, 0.1, 0.001);
+//   const intensity = gui.add(controls, "intensity", 1, 100);
+//   const y = gui.add(controls, "y", -50, 50, 1);
 
-  return { speed, intensity, y };
-}
+//   return { speed, intensity, y };
+// }
 
-function setupStats() {
-  const stats = new Stats();
-  stats.showPanel(0);
-  document.body.appendChild(stats.dom);
+// function setupStats() {
+//   const stats = new Stats();
+//   stats.showPanel(0);
+//   document.body.appendChild(stats.dom);
 
-  return stats;
-}
+//   return stats;
+// }
 
 // function printRendererInfo() {
 //   console.log("Renderer memory:", renderer.info.memory);
