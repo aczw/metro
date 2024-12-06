@@ -62,8 +62,6 @@ function setupStats() {
 // }
 
 async function main() {
-  const { speed } = setupGUI();
-  const stats = setupStats();
   const timer = new Timer();
 
   const progressText = document.querySelector<HTMLParagraphElement>("#progress")!;
@@ -222,7 +220,7 @@ async function main() {
       addElapsed = 0;
     }
 
-    if (rmElapsed >= 6) {
+    if (rmElapsed >= 8) {
       const { model, benches, trash } = activePlatforms.shift()!;
 
       scene.remove(model);
@@ -236,7 +234,7 @@ async function main() {
       rmElapsed = 0;
     }
 
-    camera.position.z += speed.getValue();
+    camera.position.z += /* speed.getValue(); */ 0.04;
     dirLight.position.z = camera.position.z;
     dirLight.target.position.z = camera.position.z;
 
@@ -255,9 +253,9 @@ async function main() {
   }
 
   renderer.setAnimationLoop((time) => {
-    stats.begin();
+    // stats.begin();
     render(time);
-    stats.end();
+    // stats.end();
   });
 
   progressText.innerText = "100%";
