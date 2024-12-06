@@ -1,5 +1,5 @@
-import GUI from "lil-gui";
-import Stats from "stats.js";
+// import GUI from "lil-gui";
+// import Stats from "stats.js";
 import * as THREE from "three";
 
 import { Timer } from "three/addons/misc/Timer.js";
