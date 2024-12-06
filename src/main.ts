@@ -60,6 +60,7 @@ function main() {
     const loader = new GLTFLoader();
     loader.manager.onProgress = (_, loaded, total) => {
       progressText.innerText = `${Math.round((loaded / total) * 100)}%`;
+      console.log(total);
     };
 
     loader.load(
