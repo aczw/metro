@@ -4,6 +4,7 @@ import * as THREE from "three";
 
 import { Timer } from "three/addons/misc/Timer.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 import "@fontsource-variable/inter";
 import "@/src/style.css";
@@ -15,23 +16,28 @@ const scene = new THREE.Scene();
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, canvas });
 renderer.shadowMap.enabled = true;
-renderer.toneMapping = THREE.NeutralToneMapping;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 2;
 
-let platform: THREE.Object3D;
-const platformWidth = 10;
-
-const activePlatforms: THREE.Object3D[] = [];
+let platformModel: THREE.Object3D;
 let offset = 0;
+
+const platformWidth = 10;
+const activePlatforms: THREE.Object3D[] = [];
 
 function setupGUI() {
   const controls = {
     speed: 0.04,
+    intensity: 10,
+    y: 6.5,
   };
 
   const gui = new GUI();
   const speed = gui.add(controls, "speed", 0.001, 0.1, 0.001);
+  const intensity = gui.add(controls, "intensity", 1, 100);
+  const y = gui.add(controls, "y", -50, 50, 1);
 
-  return { speed };
+  return { speed, intensity, y };
 }
 
 function setupStats() {
@@ -49,7 +55,7 @@ function setupStats() {
 // }
 
 function main() {
-  const { speed } = setupGUI();
+  const { speed, intensity, y } = setupGUI();
   const stats = setupStats();
   const timer = new Timer();
 
@@ -60,7 +66,6 @@ function main() {
     const loader = new GLTFLoader();
     loader.manager.onProgress = (_, loaded, total) => {
       progressText.innerText = `${Math.round((loaded / total) * 100)}%`;
-      console.log(total);
     };
 
     loader.load(
@@ -68,17 +73,17 @@ function main() {
 
       ({ scene: wrappers }) => {
         // Initial scene has a lot of wrappers for some reason
-        platform = wrappers.children[0].children[0];
+        platformModel = wrappers.children[0].children[0];
 
         // Fix some initial import transforms
-        platform.scale.set(1, 1, 1);
-        platform.rotation.y = Math.PI;
+        platformModel.scale.set(1, 1, 1);
+        platformModel.rotation.y = Math.PI;
 
         // Traverse the scene to turn on shadows for all objects
-        platform.traverse((obj) => {
+        platformModel.traverse((obj) => {
           if (obj.castShadow !== undefined) {
-            obj.castShadow = true;
             obj.receiveShadow = true;
+            obj.castShadow = true;
           }
         });
 
@@ -91,6 +96,7 @@ function main() {
           loadingScreen.remove();
         });
 
+        console.log("Platform:", platformModel);
         initScene();
       },
 
@@ -103,17 +109,17 @@ function main() {
     );
   }
 
+  function addPlatform(z: number) {
+    const model = platformModel.clone();
+    model.position.z = z;
+
+    scene.add(model);
+    activePlatforms.push(model);
+  }
+
   function initScene() {
-    let platformCopy: THREE.Object3D;
-
     // Initial scene has five platforms visible, offset -20 and +20 around origin
-    for (let i = -2; i <= 2; ++i) {
-      platformCopy = platform.clone();
-      platformCopy.position.z = i * 10;
-
-      activePlatforms.push(platformCopy);
-      scene.add(platformCopy);
-    }
+    for (let i = -2; i <= 2; ++i) addPlatform(i * 10);
 
     // Manually update offset this time
     offset = 30;
@@ -134,13 +140,8 @@ function main() {
 
   let addElapsed = 0;
   function checkToAddPlatform() {
-    if (addElapsed >= 1.5 && platform) {
-      const newPlatform = platform.clone();
-      newPlatform.position.z = offset;
-
-      activePlatforms.push(newPlatform);
-      scene.add(newPlatform);
-
+    if (addElapsed >= 1.5 && platformModel) {
+      addPlatform(offset);
       offset += platformWidth;
       addElapsed = 0;
     }
@@ -149,8 +150,8 @@ function main() {
   let rmElapsed = 0;
   function checkToRemovePlatform() {
     if (rmElapsed >= 3) {
-      const oldPlatform = activePlatforms.shift()!;
-      scene.remove(oldPlatform);
+      const model = activePlatforms.shift()!;
+      scene.remove(model);
       rmElapsed = 0;
     }
   }
@@ -164,8 +165,8 @@ function main() {
     checkToRemovePlatform();
 
     camera.position.z += speed.getValue();
-    light.position.z = camera.position.z;
-    light.target.position.z = camera.position.z;
+    dirLight.position.z = camera.position.z;
+    dirLight.target.position.z = camera.position.z;
 
     resizeRendererToDisplaySize();
     renderer.render(scene, camera);
@@ -173,25 +174,27 @@ function main() {
 
   loadPlatform();
 
-  // const controls = new OrbitControls(camera, renderer.domElement);
-  camera.position.y = 6.5;
+  const controls = new OrbitControls(camera, renderer.domElement);
+  camera.position.y = 7;
   camera.rotation.y = -Math.PI / 2;
   camera.position.x = -18;
   // controls.update();
 
-  const light = new THREE.DirectionalLight(0xffffff, 3);
-  light.position.copy(camera.position);
-  light.target.position.set(0, camera.position.y, camera.position.z);
-  light.castShadow = true;
+  const dirLight = new THREE.DirectionalLight(0xffffff, 0.15);
+  dirLight.position.copy(camera.position);
+  dirLight.target.position.set(0, camera.position.y, camera.position.z);
+  dirLight.castShadow = true;
+  scene.add(dirLight);
+  scene.add(dirLight.target);
 
-  const lightCam = light.shadow.camera;
+  const lightCam = dirLight.shadow.camera;
   lightCam.left = -25;
   lightCam.right = 25;
   lightCam.bottom = -10;
   lightCam.top = 10;
 
-  scene.add(light);
-  scene.add(light.target);
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
+  scene.add(ambientLight);
 
   renderer.setAnimationLoop((time) => {
     stats.begin();
