@@ -4,7 +4,7 @@ import * as THREE from "three";
 
 import { Timer } from "three/addons/misc/Timer.js";
 import { GLTFLoader, type GLTF } from "three/addons/loaders/GLTFLoader.js";
-import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+// import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 import "@fontsource-variable/inter";
 import "@/src/style.css";
@@ -21,10 +21,16 @@ renderer.toneMappingExposure = 2;
 
 let platformModel: THREE.Object3D;
 let benchModel: THREE.Object3D;
+let trashModel: THREE.Object3D;
 let offset = 0;
 
-const platformWidth = 10;
-const activePlatforms: THREE.Object3D[] = [];
+type Platform = {
+  model: THREE.Object3D;
+  benches?: THREE.Object3D[];
+  trash?: THREE.Object3D;
+};
+
+const activePlatforms: Platform[] = [];
 
 function setupGUI() {
   const controls = {
@@ -56,7 +62,7 @@ function setupStats() {
 // }
 
 async function main() {
-  const { speed, intensity, y } = setupGUI();
+  const { speed } = setupGUI();
   const stats = setupStats();
   const timer = new Timer();
 
@@ -66,8 +72,8 @@ async function main() {
   {
     const loader = new GLTFLoader();
 
-    loader.manager.onProgress = (_, loaded, total) => {
-      progressText.innerText = `${Math.round((loaded / total) * 100)}%`;
+    loader.manager.onProgress = (url) => {
+      progressText.innerText = `Loading ${url}`;
     };
 
     async function helper(url: string, callback: (data: GLTF) => void) {
@@ -109,29 +115,65 @@ async function main() {
 
       console.log("Bench:", benchModel);
     });
+
+    await helper("_models/trash_can.glb", ({ scene: wrappers }) => {
+      trashModel = wrappers.children[0].children[0];
+      trashModel.position.set(-12, -1.75, 0);
+
+      trashModel.traverse((obj) => {
+        if (obj.castShadow !== undefined) {
+          obj.receiveShadow = true;
+          obj.castShadow = true;
+        }
+      });
+
+      console.log("Trash can:", trashModel);
+    });
   }
 
   let benchCounter = 0;
+  let trashCounter = 0;
 
   function addPlatform(z: number) {
     const platformCopy = platformModel.clone();
     platformCopy.position.z = z;
 
+    const newPlatform: Platform = { model: platformCopy };
+
     if (benchCounter % 3 === 0) {
       let benchCopy = benchModel.clone();
       benchCopy.position.z = z;
       scene.add(benchCopy);
+      newPlatform.benches = [benchCopy];
 
-      if (Math.random() >= 0.3) {
+      if (Math.random() <= 0.7) {
         benchCopy = benchModel.clone();
         benchCopy.position.z = z + 5.25;
         scene.add(benchCopy);
+        newPlatform.benches.push(benchCopy);
+      }
+
+      // Third copy is much more rare
+      if (Math.random() <= 0.3) {
+        benchCopy = benchModel.clone();
+        benchCopy.position.z = z + 10.5;
+        scene.add(benchCopy);
+        newPlatform.benches.push(benchCopy);
       }
     }
 
+    if (trashCounter % 6 === 0) {
+      const trashCopy = trashModel.clone();
+      trashCopy.position.z = z - 12;
+      scene.add(trashCopy);
+      newPlatform.trash = trashCopy;
+    }
+
     benchCounter += 1;
+    trashCounter += 1;
+
     scene.add(platformCopy);
-    activePlatforms.push(platformCopy);
+    activePlatforms.push(newPlatform);
   }
 
   {
@@ -140,10 +182,10 @@ async function main() {
 
     // Manually update offset this time
     offset = 30;
-    console.log("Initialized scene with:", activePlatforms);
+    console.log("Initialized scene");
   }
 
-  const controls = new OrbitControls(camera, renderer.domElement);
+  // const controls = new OrbitControls(camera, renderer.domElement);
   camera.position.y = 7;
   camera.rotation.y = -Math.PI / 2;
   camera.position.x = -18;
@@ -176,13 +218,21 @@ async function main() {
 
     if (addElapsed >= 1.5 && platformModel) {
       addPlatform(offset);
-      offset += platformWidth;
+      offset += 10;
       addElapsed = 0;
     }
 
-    if (rmElapsed >= 3) {
-      const model = activePlatforms.shift()!;
+    if (rmElapsed >= 6) {
+      const { model, benches, trash } = activePlatforms.shift()!;
+
       scene.remove(model);
+
+      if (benches) {
+        for (const bench of benches) scene.remove(bench);
+      }
+
+      if (trash) scene.remove(trash);
+
       rmElapsed = 0;
     }
 
