@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { Timer } from "three/addons/misc/Timer.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
+import "@fontsource-variable/inter";
 import "@/src/style.css";
 
 // Globals
@@ -53,7 +54,13 @@ function main() {
   const timer = new Timer();
 
   function loadPlatform() {
+    const progressText = document.querySelector<HTMLParagraphElement>("#progress")!;
+    const loadingScreen = document.querySelector<HTMLDivElement>("#loading")!;
+
     const loader = new GLTFLoader();
+    loader.manager.onProgress = (_, loaded, total) => {
+      progressText.innerText = `${Math.round((loaded / total) * 100)}%`;
+    };
 
     loader.load(
       "/_models/platform_v2.glb",
@@ -74,13 +81,20 @@ function main() {
           }
         });
 
-        console.log("Loaded platform:", platform);
+        // Remove onProgress listener from default loading manager
+        loader.manager.onProgress = () => {};
+
+        progressText.innerText = "100%";
+        loadingScreen.classList.add("fade");
+        loadingScreen.addEventListener("transitionend", () => {
+          loadingScreen.remove();
+        });
+
         initScene();
       },
 
-      (progress) => {
-        console.log(`${(progress.loaded / progress.total) * 100}% loaded`);
-      },
+      // Use default loading manager's onProgress, not this one
+      undefined,
 
       (error) => {
         console.error("Error loading platform:", error);
@@ -91,6 +105,7 @@ function main() {
   function initScene() {
     let platformCopy: THREE.Object3D;
 
+    // Initial scene has five platforms visible, offset -20 and +20 around origin
     for (let i = -2; i <= 2; ++i) {
       platformCopy = platform.clone();
       platformCopy.position.z = i * 10;
@@ -117,13 +132,7 @@ function main() {
   }
 
   let addElapsed = 0;
-  let rmElapsed = 0;
-
-  function render(time: number) {
-    timer.update(time);
-    addElapsed += timer.getDelta();
-    rmElapsed += timer.getDelta();
-
+  function checkToAddPlatform() {
     if (addElapsed >= 1.5 && platform) {
       const newPlatform = platform.clone();
       newPlatform.position.z = offset;
@@ -134,12 +143,24 @@ function main() {
       offset += platformWidth;
       addElapsed = 0;
     }
+  }
 
+  let rmElapsed = 0;
+  function checkToRemovePlatform() {
     if (rmElapsed >= 3) {
       const oldPlatform = activePlatforms.shift()!;
       scene.remove(oldPlatform);
       rmElapsed = 0;
     }
+  }
+
+  function render(time: number) {
+    timer.update(time);
+    addElapsed += timer.getDelta();
+    rmElapsed += timer.getDelta();
+
+    checkToAddPlatform();
+    checkToRemovePlatform();
 
     camera.position.z += speed.getValue();
     light.position.z = camera.position.z;
